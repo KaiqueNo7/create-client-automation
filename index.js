@@ -1,9 +1,13 @@
 import { input, select } from '@inquirer/prompts';
 import fs from 'fs';
 import path from 'path';
-import { exec } from 'child_process';
+import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { generateThemeContent } from './themeTemplate.js';
+import { env } from 'process';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,7 +35,7 @@ async function createClient() {
   });
 
   const formAlignment = await select({
-    message: 'Qual é a alinhamento do formulário?',
+    message: 'Qual é o alinhamento do formulário?',
     choices: [
       { name: 'Esquerda', value: 'left' },
       { name: 'Centro', value: 'center' },
@@ -49,11 +53,11 @@ async function createClient() {
     validate: (input) => input === '' || fs.existsSync(input) ? true : 'O caminho do arquivo é inválido. Por favor, insira um caminho válido.',
   });
 
-  const assetsPath = path.join(__dirname, 'classrom', 'src', 'assets', nameClient, 'img');
-  const themesPath = path.join(__dirname, 'classrom', 'src', 'scss', 'themes');
-  const themeFile = path.join(themesPath, `_themes_${nameClient}.scss`);
+  const localAssetsPath = path.join(__dirname, 'classroom', 'src', 'assets', nameClient, 'img');
+  const localThemesPath = path.join(__dirname, 'classroom', 'src', 'scss', 'themes');
+  const localThemeFile = path.join(localThemesPath, `_themes_${nameClient}.scss`);
 
-  [assetsPath, themesPath].forEach((dir) => {
+  [localAssetsPath, localThemesPath].forEach((dir) => {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
       console.log(`Criado: ${dir}`);
@@ -61,13 +65,14 @@ async function createClient() {
   });
 
   const logoFileName = path.basename(logoPath);
-  const logoDestination = path.join(assetsPath, logoFileName);
+  const logoDestination = path.join(localAssetsPath, logoFileName);
+
   fs.copyFileSync(logoPath, logoDestination);
   console.log(`Arquivo copiado para: ${logoDestination}`);
 
   if (bgPath) {
     const bgFileName = path.basename(bgPath);
-    const bgDestination = path.join(assetsPath, bgFileName);
+    const bgDestination = path.join(localAssetsPath, bgFileName);
     fs.copyFileSync(bgPath, bgDestination);
     console.log(`Arquivo copiado para: ${bgDestination}`);
   }
@@ -81,22 +86,64 @@ async function createClient() {
     formAlignment,
   });
 
-  fs.writeFileSync(themeFile, themeContent);
-  console.log(`Arquivo de tema criado: ${themeFile}`);
+  fs.writeFileSync(localThemeFile, themeContent);
+  console.log(`Arquivo de tema criado: ${localThemeFile}`);
 
-  console.log('Rodando o comando "npm run build"...');
-  exec('npm run build', { cwd: path.join(__dirname, 'classrom') }, (error, stdout, stderr) => {
-    if (error) {
-      console.error(`Erro ao rodar o build: ${error.message}`);
-      return;
+  const scireFrontEndPath = env.SCIRE_FRONTEND_PATH || path.resolve(__dirname, '..', 'scire-front-end');
+  const targetAssetsPath = path.join(scireFrontEndPath, 'classroom', 'src', 'assets', nameClient, 'img');
+  const targetThemesPath = path.join(scireFrontEndPath, 'classroom', 'src', 'scss', 'themes');
+  const targetThemeFile = path.join(targetThemesPath, `_themes_${nameClient}.scss`);
+
+  [targetAssetsPath, targetThemesPath].forEach((dir) => {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+      console.log(`Criado: ${dir}`);
     }
-
-    if (stderr) {
-      console.error(`Erro no processo de build: ${stderr}`);
-    }
-
-    console.log(`Build finalizado com sucesso: \n${stdout}`);
   });
+
+  fs.copyFileSync(logoDestination, path.join(targetAssetsPath, logoFileName));
+  console.log(`Logo copiada para: ${targetAssetsPath}`);
+
+  if (bgPath) {
+    fs.copyFileSync(path.join(localAssetsPath, path.basename(bgPath)), path.join(targetAssetsPath, path.basename(bgPath)));
+    console.log(`Background copiado para: ${targetAssetsPath}`);
+  }
+
+  fs.copyFileSync(localThemeFile, targetThemeFile);
+  console.log(`Arquivo de tema copiado para: ${targetThemeFile}`);
+
+  const createPR = await select({
+    message: 'Deseja criar uma nova branch e iniciar uma PR?',
+    choices: [
+      { name: 'Sim', value: 'yes' },
+      { name: 'Não', value: 'no' },
+    ],
+  });
+
+  if (createPR === 'yes') {
+    const branchName = await input({
+      message: 'Qual é o nome da branch?',
+      validate: (input) => input ? true : 'O nome da branch não pode estar vazio.',
+    });
+
+    console.log(`Acessando o diretório: ${scireFrontEndPath}`);
+    try {
+      execSync('git checkout master', { cwd: scireFrontEndPath, stdio: 'inherit' });
+      console.log('Branch alterada para master.');
+
+      execSync('git pull', { cwd: scireFrontEndPath, stdio: 'inherit' });
+      console.log('Repositório atualizado com git pull.');
+
+      execSync(`git checkout -b feature/${branchName}`, { cwd: scireFrontEndPath, stdio: 'inherit' });
+      console.log(`Nova branch criada: feature/${branchName}`);
+
+      execSync(` git push --set-upstream origin feature/${branchName}`, { cwd: scireFrontEndPath, stdio: 'inherit' });
+      console.log(`Push criado para a branch: feature/${branchName}`);
+    } catch (error) {
+      console.error(`Erro ao manipular o repositório Git: ${error.message}`);
+      process.exit(1);
+    }
+  }
 
   console.log(`Estrutura completa criada para o cliente: ${nameClient}`);
 }
