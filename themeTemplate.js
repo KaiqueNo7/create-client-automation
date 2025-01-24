@@ -1,5 +1,12 @@
-export function generateThemeContent({ nameClient, colorPrimary, colorSecondary, logoFileName, bgPath, formAlignment }) {
-return `$theme-color-primary: ${colorPrimary};
+export function generateThemeContent({
+  nameClient,
+  colorPrimary,
+  colorSecondary,
+  logoFileName,
+  bgPath,
+  formAlignment,
+}) {
+  return `$theme-color-primary: ${colorPrimary};
 $theme-color-secondary: ${colorSecondary};
 
 $theme-color-primary-text: #212121;
@@ -27,10 +34,15 @@ $brand-mini-img: url(/assets/${nameClient}/img/logo-medportal-mini.svg);
 $brand-mini-size: 40px;
 
 $login-cardheader-bg: $white;
-$login-image-bg: url(/assets/${nameClient}/img/${bgPath});
+$login-image-bg: ${
+    bgPath
+      ? `url(/assets/${nameClient}/img/${bgPath})`
+      : `radial-gradient(circle, ${colorPrimary} 35%, ${colorSecondary} 100%)`
+  };
+
 $login-bg: $theme-color-expired;
 
-$sidenav-score-color-default:darken($theme-color-secondary, 30%);
+$sidenav-score-color-default: darken($theme-color-secondary, 30%);
 
 $sidenav-width: 110px;
 $sidenav-height-mobile: 70px;
@@ -95,8 +107,8 @@ $view-bgcolor: $gray-200;
 
 $tooltip-bg: $gray-800;
 
-$ecommerce-enable:'inline-block';
-$events-enable:none;
+$ecommerce-enable: 'inline-block';
+$events-enable: none;
 
 // Height logo definition
 $brand-small-height: ($header-height + 8) / 2;
@@ -116,7 +128,7 @@ $brand-background-size-mobile-default: auto $brand-small-height-mobile;
 $brand-logo-height-default: $brand-small-height;
 $brand-background-size-default: auto $brand-small-height;
 
-$footer-brand-sponsor-height:25px;
+$footer-brand-sponsor-height: 25px;
 
 // Login
 $brand-logo-height-bg-login: 280px;
@@ -126,5 +138,5 @@ $login-box-align: '${formAlignment}';
 // Toolbox alternative
 $toolbox-alternative: false;
 $course-title-lines: 3;
-  `;
+`;
 }
