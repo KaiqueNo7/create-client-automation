@@ -1,8 +1,8 @@
 {
-  "nameClient": "ecomedicalcenter",
-  "colorPrimary": "#39b883",
-  "colorSecondary": "#12342b",
+  "nameClient": "hospitaledmundovasconcelos",
+  "colorPrimary": "#16f9f9",
+  "colorSecondary": "#4d3aad",
   "formAlignment": "center",
-  "logoPath": "/home/user/Downloads/logo.svg",
+  "logoPath": "/home/user/Downloads/logo.png",
   "bgPath": ""
 }

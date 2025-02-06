@@ -1,11 +1,12 @@
 import { input, select } from '@inquirer/prompts';
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
+import { exec, execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { env } from 'process';
 import dotenv from 'dotenv';
-import { createFilesLocal } from './createFilesLocal.js';
+import { generateThemeContent } from './themeTemplate.js';
+import { generateEnvClassroom } from './envClassroom.js';
 
 dotenv.config();
 
@@ -30,6 +31,7 @@ const __dirname = path.dirname(__filename);
 
 const historyFilePath = path.resolve(__dirname, 'history.json');
 const localPath = path.join(__dirname, 'classroom');
+const localEnvFile = path.join(localPath, `.env`);
 
 async function createClient() {
   const history = loadHistory();
@@ -83,17 +85,79 @@ async function createClient() {
   const newHistory = { nameClient, colorPrimary, colorSecondary, formAlignment, logoPath, bgPath };
   saveHistory(newHistory);
 
-  createFilesLocal({
+  const localAssetsPath = path.join(__dirname, 'classroom', 'src', 'assets', nameClient, 'img');
+
+  const localThemesPath = path.join(__dirname, 'classroom', 'src', 'scss', 'themes');
+  const localThemeFile = path.join(localThemesPath, `_themes_${nameClient}.scss`);
+
+  [localAssetsPath, localThemesPath].forEach((dir) => {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+      console.log(`Criado: ${dir}`);
+    }
+  });
+
+  const logoFileName = path.basename(logoPath);
+  const logoDestination = path.join(localAssetsPath, logoFileName);
+
+  fs.copyFileSync(logoPath, logoDestination);
+  console.log(`Arquivo copiado para: ${logoDestination}`);
+
+  if (bgPath) {
+    const bgFileName = path.basename(bgPath);
+    const bgDestination = path.join(localAssetsPath, bgFileName);
+    fs.copyFileSync(bgPath, bgDestination);
+    console.log(`Arquivo copiado para: ${bgDestination}`);
+  }
+
+  const themeContent = generateThemeContent({
     nameClient,
     colorPrimary,
     colorSecondary,
-    logoPath,
+    logoFileName,
     bgPath: bgPath ? path.basename(bgPath) : null,
     formAlignment,
-    __dirname
   });
 
-  await previewClientPage(nameClient, localPath);
+  fs.writeFileSync(localThemeFile, themeContent);
+  console.log(`Arquivo de tema criado: ${localThemeFile}`);
+
+  const envClassroom = generateEnvClassroom({nameClient});
+
+  fs.writeFileSync(localEnvFile, envClassroom);
+  console.log(`Arquivo de configuração criado: ${localEnvFile}`);
+  
+  console.log('Criando visualização do template');
+  try {
+    // 🟢 Troca a versão do Node antes de rodar
+    execSync('source $HOME/.nvm/nvm.sh && nvm use 14', { cwd: localPath, stdio: 'inherit', shell: '/bin/bash' });
+
+    // 🟢 Inicia o servidor do template (`npm run dev`) em um processo separado
+    const devProcess = spawn('bash', ['-c', 'source $HOME/.nvm/nvm.sh && nvm use 14 && npm run dev'], {
+      cwd: localPath,
+      stdio: 'inherit',
+      detached: true, // Permite que continue rodando separadamente
+    });
+
+    // 🟢 Aguarda decisão do usuário
+    const templateOk = await select({
+      message: 'Você deseja continuar?',
+      choices: [
+        { name: 'Sim', value: 'yes' },
+        { name: 'Não', value: 'no' },
+      ],
+    });
+
+    if (templateOk === 'no') {
+      console.log('Encerrando o servidor...');
+      process.kill(-devProcess.pid); // Mata o processo e subprocessos corretamente
+      process.exit(1);
+    }
+
+  } catch (error) {
+    console.error(`Erro ao criar o template localmente: ${error.message}`);
+    process.exit(1);
+  }
 
   const sendFiles = await select({
     message: 'Deseja enviar os arquivos para o projeto front-end?',
