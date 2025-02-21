@@ -1,7 +1,7 @@
 import { input, select } from '@inquirer/prompts';
 import fs from 'fs';
 import path from 'path';
-import { exec, execSync } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { env } from 'process';
 import dotenv from 'dotenv';
@@ -129,17 +129,12 @@ async function createClient() {
   
   console.log('Criando visualização do template');
   try {
-    // 🟢 Troca a versão do Node antes de rodar
-    execSync('source $HOME/.nvm/nvm.sh && nvm use 14', { cwd: localPath, stdio: 'inherit', shell: '/bin/bash' });
-
-    // 🟢 Inicia o servidor do template (`npm run dev`) em um processo separado
     const devProcess = spawn('bash', ['-c', 'source $HOME/.nvm/nvm.sh && nvm use 14 && npm run dev'], {
       cwd: localPath,
-      stdio: 'inherit',
-      detached: true, // Permite que continue rodando separadamente
+      stdio: 'inherit', 
+      detached: true, 
     });
 
-    // 🟢 Aguarda decisão do usuário
     const templateOk = await select({
       message: 'Você deseja continuar?',
       choices: [
@@ -150,7 +145,7 @@ async function createClient() {
 
     if (templateOk === 'no') {
       console.log('Encerrando o servidor...');
-      process.kill(-devProcess.pid); // Mata o processo e subprocessos corretamente
+      process.kill(-devProcess.pid);
       process.exit(1);
     }
 
@@ -203,6 +198,7 @@ async function createClient() {
       const branchName = await input({
         message: 'Qual é o nome da branch?',
         validate: (input) => input ? true : 'O nome da branch não pode estar vazio.',
+        default: history.branchName
       });
   
       console.log(`Acessando o diretório: ${scireFrontEndPath}`);
@@ -214,6 +210,9 @@ async function createClient() {
         console.log('Repositório atualizado com git pull.');
   
         execSync(`git checkout -b feature/${branchName}`, { cwd: scireFrontEndPath, stdio: 'inherit' });
+        console.log(`Nova branch criada: feature/${branchName}`);
+
+        execSync(`git commit -am "creating plataform to client: ${nameClient}`, { cwd: scireFrontEndPath, stdio: 'inherit' });
         console.log(`Nova branch criada: feature/${branchName}`);
   
         execSync(` git push --set-upstream origin feature/${branchName}`, { cwd: scireFrontEndPath, stdio: 'inherit' });
