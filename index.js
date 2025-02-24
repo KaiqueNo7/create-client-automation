@@ -1,5 +1,5 @@
 import { input, select } from '@inquirer/prompts';
-import fs from 'fs';
+import fs, { copyFile } from 'fs';
 import path from 'path';
 import { spawn, execSync } from 'child_process';
 import { fileURLToPath } from 'url';
@@ -24,6 +24,26 @@ function loadHistory() {
 
 function saveHistory(history) {
   fs.writeFileSync(historyFilePath, JSON.stringify(history, null, 2));
+}
+
+function copyDirectory(sourceDir, targetDir) {
+  if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+  }
+
+  const files = fs.readdirSync(sourceDir);
+
+  files.forEach(file => {
+      const localThemeFile = path.join(sourceDir, file);
+      const targetThemeFile = path.join(targetDir, file);
+
+      if (fs.statSync(localThemeFile).isFile()) {
+          fs.copyFileSync(localThemeFile, targetThemeFile);
+          console.log(`Arquivo copiado: ${file}`);
+      }
+  });
+
+  console.log('Cópia concluída!');
 }
 
 const __filename = fileURLToPath(import.meta.url);
@@ -149,6 +169,14 @@ async function createClient() {
       process.exit(1);
     }
 
+    if (templateOk == 'yes') {
+      console.log('Rodando o build...');
+      spawn('bash', ['-c', 'source $HOME/.nvm/nvm.sh && nvm use 14 && npm run build'], {
+        cwd: localPath,
+        stdio: 'inherit', 
+        detached: true, 
+      });
+    }
   } catch (error) {
     console.error(`Erro ao criar o template localmente: ${error.message}`);
     process.exit(1);
@@ -163,7 +191,7 @@ async function createClient() {
   });
 
   if (sendFiles === 'yes') {
-    const scireFrontEndPath = env.SCIRE_FRONTEND_PATH || path.resolve(__dirname, '..', 'scire-front-end');
+    const scireFrontEndPath = env.FRONTEND_PATH || path.resolve(__dirname, '..', 'scire-front-end');
     const targetAssetsPath = path.join(scireFrontEndPath, 'classroom', 'src', 'assets', nameClient, 'img');
     const targetThemesPath = path.join(scireFrontEndPath, 'classroom', 'src', 'scss', 'themes');
     const targetThemeFile = path.join(targetThemesPath, `_themes_${nameClient}.scss`);
@@ -187,7 +215,7 @@ async function createClient() {
     console.log(`Arquivo de tema copiado para: ${targetThemeFile}`);
 
     const createPR = await select({
-      message: 'Deseja criar uma nova branch e iniciar uma PR?',
+      message: 'Deseja criar uma nova branch e iniciar uma PR para o front-end?',
       choices: [
         { name: 'Sim', value: 'yes' },
         { name: 'Não', value: 'no' },
@@ -212,7 +240,8 @@ async function createClient() {
         execSync(`git checkout -b feature/${branchName}`, { cwd: scireFrontEndPath, stdio: 'inherit' });
         console.log(`Nova branch criada: feature/${branchName}`);
 
-        execSync(`git commit -am "creating plataform to client: ${nameClient}`, { cwd: scireFrontEndPath, stdio: 'inherit' });
+        execSync(`git add .`, { cwd: scireFrontEndPath, stdio: 'inherit' });
+        execSync(`git commit -m "creating platform for client: ${nameClient}"`, { cwd: scireFrontEndPath, stdio: 'inherit' });
         console.log(`Nova branch criada: feature/${branchName}`);
   
         execSync(` git push --set-upstream origin feature/${branchName}`, { cwd: scireFrontEndPath, stdio: 'inherit' });
@@ -225,8 +254,37 @@ async function createClient() {
   
     console.log(`Estrutura completa criada para o cliente: ${nameClient}`);
   }
+
+  const createBackEndFiles = await select({
+    message: 'Deseja criar os arquivos no back-end?',
+    choices: [
+      { name: 'Sim', value: 'yes' },
+      { name: 'Não', value: 'no' },
+    ],
+  });
+
+  if(createBackEndFiles == 'yes'){
+    const scireBackEndPath = env.BACKEND_PATH || path.resolve(__dirname, '..', 'scire-lms-backend');
+    
+    const referenceConfBackEndPath = path.join(env.BACKEND_PATH, 'conf', env.CLIENT_REFERENCE_PATH);
+    const confBackEndPath = path.join(env.BACKEND_PATH, 'conf', nameClient);
+    
+    copyDirectory(referenceConfBackEndPath, confBackEndPath);
+    
+    const localBuildPath = path.join(__dirname, 'classroom', 'build', 'assets', nameClient);
+    const targetAssetsPath = path.join(scireBackEndPath, 'web', 'assets');
+
+    copyDirectory(localBuildPath, targetAssetsPath);
+  }
 }
 
 createClient()
-  .then(() => console.log("Processo finalizado com sucesso!"))
-  .catch((err) => console.error("Erro ao executar o script:", err));
+  .then(() => {
+    console.log("Processo finalizado com sucesso!");
+    process.exit(0);
+  })
+  .catch((err) => {
+    console.error("Erro ao executar o script:", err);
+    process.exit(1);
+  });
+
