@@ -16,7 +16,8 @@
   "dependencies": {
     "@inquirer/prompts": "^7.2.3",
     "dotenv": "^16.4.7",
-    "inquirer": "^12.3.2"
+    "inquirer": "^12.3.2",
+    "sharp": "^0.33.5"
   },
   "devDependencies": {
     "@babel/polyfill": "^7.12.1",

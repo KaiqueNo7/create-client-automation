@@ -1,8 +1,8 @@
 {
-  "nameClient": "aaaaaa",
-  "colorPrimary": "#FFF",
-  "colorSecondary": "#F00",
-  "formAlignment": "left",
+  "nameClient": "fluminense",
+  "colorPrimary": "#fff",
+  "colorSecondary": "#06c",
+  "formAlignment": "center",
   "logoPath": "/home/user/Downloads/logo.png",
   "bgPath": ""
 }

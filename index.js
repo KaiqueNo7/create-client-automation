@@ -7,6 +7,7 @@ import { env } from 'process';
 import dotenv from 'dotenv';
 import { generateThemeContent } from './themeTemplate.js';
 import { generateEnvClassroom } from './envClassroom.js';
+import sharp from 'sharp';
 
 dotenv.config();
 
@@ -28,22 +29,24 @@ function saveHistory(history) {
 
 function copyDirectory(sourceDir, targetDir) {
   if (!fs.existsSync(targetDir)) {
-      fs.mkdirSync(targetDir, { recursive: true });
+    fs.mkdirSync(targetDir, { recursive: true });
   }
 
-  const files = fs.readdirSync(sourceDir);
+  const entries = fs.readdirSync(sourceDir, { withFileTypes: true });
 
-  files.forEach(file => {
-      const localThemeFile = path.join(sourceDir, file);
-      const targetThemeFile = path.join(targetDir, file);
+  entries.forEach(entry => {
+    const sourcePath = path.join(sourceDir, entry.name);
+    const targetPath = path.join(targetDir, entry.name);
 
-      if (fs.statSync(localThemeFile).isFile()) {
-          fs.copyFileSync(localThemeFile, targetThemeFile);
-          console.log(`Arquivo copiado: ${file}`);
-      }
+    if (entry.isDirectory()) {
+      copyDirectory(sourcePath, targetPath);
+    } else {
+      fs.copyFileSync(sourcePath, targetPath);
+      console.log(`Arquivo copiado: ${targetPath}`);
+    }
   });
 
-  console.log('Cópia concluída!');
+  console.log(`Cópia de ${sourceDir} para ${targetDir} concluída!`);
 }
 
 const __filename = fileURLToPath(import.meta.url);
@@ -272,9 +275,33 @@ async function createClient() {
     copyDirectory(referenceConfBackEndPath, confBackEndPath);
     
     const localBuildPath = path.join(__dirname, 'classroom', 'build', 'assets', nameClient);
-    const targetAssetsPath = path.join(scireBackEndPath, 'web', 'assets');
+    const targetAssetsPath = path.join(scireBackEndPath, 'web', 'assets', nameClient);
 
     copyDirectory(localBuildPath, targetAssetsPath);
+
+    const targetImgPath = path.join(targetAssetsPath, 'img');
+
+    const logoDestination = path.join(targetImgPath, 'logo.png');
+    const logoHeaderDestination = path.join(targetImgPath, 'logo-header.png');
+    const logoEmailDestination = path.join(targetImgPath, 'logo-email.png');
+
+    async function resizeLogo() {
+      try {
+        await sharp(logoDestination)
+          .resize({ height: 45 })
+          .toFile(logoHeaderDestination);
+        console.log(`Imagem reduzida para cabeçalho: ${logoHeaderDestination}`);
+    
+        await sharp(logoDestination)
+          .resize({ height: 45 })
+          .toFile(logoEmailDestination);
+        console.log(`Imagem reduzida para e-mail: ${logoEmailDestination}`);
+      } catch (error) {
+        console.error('Erro ao redimensionar as imagens:', error);
+      }
+    }
+
+    await resizeLogo();
   }
 }
 
